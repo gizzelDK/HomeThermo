@@ -159,6 +159,12 @@ void loop() {
           
           client.println("<head>");
           client.println("<style>");///////// Styling goees here
+          client.println("<script type=\"text/javascript\">");///////// Action goees here
+          
+          
+          client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here
+          
+          client.println("</script>");///////// Action goees here
           client.print("*{background-color:#000;color:hotpink;}h1{color:#00F}");
           client.println("</style>");
           
@@ -168,10 +174,10 @@ void loop() {
             client.println("<h1>");
             client.println("Gyygle Thermo");
             client.println("</h1>");
-            client.println("<button onclick=\"turnTemperatureUp()\">");// Inline script with ajax call?
+            client.println("<button onclick=\"turnTemperatureUp\">");// Inline script with ajax call?
             client.println("Turn up the Heat");
             client.println("</button>");
-            client.println("<button onclick=\"turnTemperatureDown()\">");// Inline script with ajax call?
+            client.println("<button onclick=\"turnTemperatureDown\">");// Inline script with ajax call?
             client.println("Turn down the Heat");
             client.println("</button>");
             client.println("<br />");
