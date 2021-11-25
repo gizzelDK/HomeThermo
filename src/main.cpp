@@ -1,13 +1,20 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <Wire.h>
-#include <EthernetUtp.h>
+#include <EthernetUdp.h>
 
 /// Temperature sampling and control variables
 #define DS1621_ADDRESS 0x48
 
-int upTemp = A4;
+//int upTemp = A4;
+int RED = A4;
 int downTemp = A5;
+const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
+unsigned int localPort = 8888;
+const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+// A UDP instance to let us send and receive packets over UDP
+EthernetUDP Udp;
 
 int16_t get_temperature() {
   Wire.beginTransmission(DS1621_ADDRESS); // connect to DS1621 (send DS1621 address)
@@ -16,11 +23,11 @@ int16_t get_temperature() {
   Wire.requestFrom(DS1621_ADDRESS, 2);    // request 2 bytes from DS1621 and release I2C bus at end of reading
   uint8_t t_msb = Wire.read();            // read temperature MSB register
   uint8_t t_lsb = Wire.read();            // read temperature LSB register
- 
+
   // calculate full temperature (raw value)
   int16_t raw_t = (int8_t)t_msb << 1 | t_lsb >> 7;
   // convert raw temperature value to tenths °C
-  raw_t = raw_t * 10/2;
+  raw_t = raw_t * 10 / 2;
   return raw_t;
 }
 /// Server variables
@@ -29,24 +36,20 @@ int16_t get_temperature() {
 byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
-IPAddress ip(192, 168, 0, 177);
-const char timeServer[] = "time.nist.gov";
-using int local = 8888;
-const int NTP_PACKAGE_SIZE = 48;
-byte packetBuffer[NTP_PACKET_SIZE];
-EthernetUDP Udp;
+IPAddress ip(192, 168, 1, 177);
+
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
-void turnTemperatureUp(){
-  digitalWrite(upTemp, HIGH);
+void turnTemperatureUp() {
+  digitalWrite(RED, HIGH);
   delay(1000);
-  digitalWrite(upTemp, LOW);
+  digitalWrite(RED, LOW);
   Serial.println("Turned heat up");
 }
-void turnTemperatureDown(){
+void turnTemperatureDown() {
   digitalWrite(downTemp, HIGH);
   delay(1000);
   digitalWrite(downTemp, LOW);
@@ -78,44 +81,52 @@ void sendNTPpacket(const char * address) {
 
 char c_buffer[8], f_buffer[8]; // Char arrays til temperatur bytes
 
-void setup() {
-    Wire.begin();
-    Wire.beginTransmission(DS1621_ADDRESS);
-    Wire.write(0xAC);
-    Wire.write(0);
-    Wire.beginTransmission(DS1621_ADDRESS);
-    Wire.write(0xEE);
-    Wire.endTransmission();
+/// Get ledchange handling
+void ledChangeStatus(EthernetClient client)
+{
+  int state = digitalRead(RED);
+  Serial.println(state);
+  if (state == 1) {
+    digitalWrite(RED, LOW);
+    client.print("OFF");
+  }
+  else {
+    digitalWrite(RED, HIGH);
+    client.print("ON");
+  }
+}
+void ajaxRequest(EthernetClient client)
+{
+  for (int analogChannel = 0; analogChannel < 6; analogChannel++) {
+    int sensorReading = analogRead(analogChannel);
+    client.print("analog input ");
+    client.print(analogChannel);
+    client.print(" is ");
+    client.print(sensorReading);
+    client.println("<br />");
+  }
+}
+void setup() {    
+  Wire.begin();
+  Wire.beginTransmission(DS1621_ADDRESS);
+  Wire.write(0xAC);
+  Wire.write(0);
+  Wire.beginTransmission(DS1621_ADDRESS);
+  Wire.write(0xEE);
+  Wire.endTransmission();
   pinMode(20, OUTPUT);
 
-    pinMode(upTemp, OUTPUT); 
-    pinMode(downTemp, OUTPUT); 
+  pinMode(RED, OUTPUT);
+  pinMode(downTemp, OUTPUT);
   // Open serial communications and wait for port to open:
   Serial.begin(115200);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
-  //Start Ethernet and UDP.
-  if (Ethernet.Begin(mac) == 0) {
-      Serial.println("Failed to configure Ethernet using DHCP");
-      //Check for Ethernet hardware present
-      if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-          Serial.println("Ethernet shield was not found. Sorry, can´t run without hardware :( ");
-      }
-      else if(Ethernet.linkStatus() == LinkOFF){
-        Serial.println("Ethernet cable is not connected.");
-      }
-      //no point in carrying on, so do nothing forevermore:
-      while(true){
-        delay(1);
-      }
-      UDP.begin(local);
-  }
+    Ethernet.begin(mac, ip);
   Serial.println("Ethernet WebServer Example");
 
   // start the Ethernet connection and the server:
-  Ethernet.begin(mac, ip);
-
   // Check for Ethernet hardware present
   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
     Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
@@ -127,6 +138,7 @@ void setup() {
     Serial.println("Ethernet cable is not connected.");
   }
 
+  Udp.begin(localPort);
   // start the server
   server.begin();
   Serial.print("server is at ");
@@ -140,9 +152,9 @@ void loop() {
   // get temperature in tenths °C
   int16_t c_temp = get_temperature();
   // convert tenths °C to tenths °F
-  int16_t f_temp = c_temp * 9/5 + 320 ;
+  int16_t f_temp = c_temp * 9 / 5 + 320 ;
 
-    if(c_temp < 230) {   // if temperature < 23 °C
+  if (c_temp < 230) {  // if temperature < 23 °C
     c_temp = abs(c_temp);  // absolute value
     sprintf(c_buffer, "-%02u.%1u%cC", c_temp / 10, c_temp % 10, 223);
     //digitalWrite(20,LOW);
@@ -156,17 +168,17 @@ void loop() {
     else
     {
       sprintf(c_buffer, " %02u.%1u%cC", c_temp / 10, c_temp % 10, 223); //sprintf = String print format
-      
+
     }
   }
-    if(f_temp < 0) {   // if temperature < 0 °F
+  if (f_temp < 0) {  // if temperature < 0 °F
     f_temp = abs(f_temp);  // absolute value
     sprintf(f_buffer, "-%02u.%1u%cF", f_temp / 10, f_temp % 10, 223);
     digitalWrite(20, HIGH);
   }
   else {
-    if (f_temp >= 100)  
-    {// if temperature >= 100.0 °F
+    if (f_temp >= 100)
+    { // if temperature >= 100.0 °F
       sprintf(f_buffer, "%03u.%1u%cF", f_temp / 10, f_temp % 10, 223);
       digitalWrite(20, LOW);
     }
@@ -176,11 +188,12 @@ void loop() {
     }
   }
 
-   Serial.println(c_buffer);
+  Serial.println(c_buffer);
   Serial.println(f_buffer);  // print f_buffer (temperature in °F)
-  
+
   // listen for incoming clients
   EthernetClient client = server.available();
+  
   if (client) {
     Serial.println("new client");
     // an http request ends with a blank line
@@ -201,39 +214,78 @@ void loop() {
           client.println();
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
-          
+
           client.println("<head>");
-          client.println("<style>");///////// Styling goees here
           client.println("<script type=\"text/javascript\">");///////// Action goees here
-          
-          
+
+
           client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here
-          
+
           client.println("</script>");///////// Action goees here
+
+          client.println("<style>");///////// Styling goees here
           client.print("*{background-color:#000;color:hotpink;}h1{color:#00F}");
           client.println("</style>");
-          
+
           client.println("</head>");
 
           client.println("<body>");
-            client.println("<h1>");
-            client.println("Gyygle Thermo");
-            client.println("</h1>");
-            client.println("<button onclick=\"turnTemperatureUp\">");// Inline script with ajax call?
-            client.println("Turn up the Heat");
-            client.println("</button>");
-            client.println("<button onclick=\"turnTemperatureDown\">");// Inline script with ajax call?
-            client.println("Turn down the Heat");
-            client.println("</button>");
-            client.println("<br />");
+          client.println("<h1>");
+          client.println("Gyygle Thermo");
+          client.println("</h1>");
+
+          client.println("<div><span id=\"led_status\">");
+          if (digitalRead(RED) == 1)
+            client.println("On");
+          else
+            client.println("Off");
+          client.println("</span> | <button onclick=\"changeLEDStatus()\">Change Status</button> </div>");
+
+          client.println("<button onclick=\"turnTemperatureUp()\">");// Inline script with ajax call?
+          client.println("Turn up the Heat");
+          client.println("</button>");
+          client.println("<button onclick=\"turnTemperatureDown\">");// Inline script with ajax call?
+          client.println("Turn down the Heat");
+          client.println("</button>");
+          client.println("<br />");
           // output the value of each analog input pin////////////////////
-            client.print("Farenhiet = ");
-            client.println(f_buffer);
-            client.print("Celcius = ");
-            client.println(c_buffer);
-            client.println("<br />");
-            client.println("</body>");
-            client.println("</html>");
+          client.print("Farenhiet = ");
+          client.println(f_buffer);
+          client.print("Celcius = ");
+          client.println(c_buffer);
+          client.println("<br />");
+
+          /////JS
+          client.println("<script>window.setInterval(function(){");
+          client.println("nocache = \"&nocache=\" + Math.random() * 10;");
+          client.println("var request = new XMLHttpRequest();");
+          client.println("request.onreadystatechange = function() {");
+          client.println("if (this.readyState == 4) {");
+          client.println("if (this.status == 200) {");
+          client.println("if (this.responseText != null) {");
+          client.println("console.log(this.reesponseText)");
+          client.println("document.getElementById(\"analoge_data\").innerHTML = this.responseText;");
+          client.println("}}}}");
+          client.println("request.open(\"GET\", \"ajaxrefresh\" + nocache, true);");
+          client.println("request.send(null);");
+          client.println("}, 5000);");
+          client.println("function changeLEDStatus() {");
+          client.println("nocache = \"&nocache=\" + Math.random() * 10;");
+          client.println("var request = new XMLHttpRequest();");
+          client.println("request.onreadystatechange = function() {");
+          client.println("if (this.readyState == 4) {");
+          client.println("if (this.status == 200) {");
+          client.println("if (this.responseText != null) {");
+          client.println("console.log(this.reesponseText)");///// DEBUG
+          client.println("document.getElementById(\"led_status\").innerHTML = this.responseText;");
+          client.println("}}}}");
+          client.println("request.open(\"GET\", \"?ledstatus=1\" + nocache, true);");
+          client.println("request.send(null);");
+          client.println("}");
+          client.println("</script>");
+
+          client.println("</body>");
+          client.println("</html>");
           break;
         }
         if (c == '\n') {
@@ -251,54 +303,4 @@ void loop() {
     client.stop();
     Serial.println("client disconnected");
   }
-  //NTP START
-  sendNTPpacket(timeServer); // send an NTP packet to a time server
-
-  // wait to see if a reply is available
-  delay(1000);
-  if (Udp.parsePacket()) {
-    // We've received a packet, read the data from it
-    Udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
-
-    // the timestamp starts at byte 40 of the received packet and is four bytes,
-    // or two words, long. First, extract the two words:
-
-    unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-    unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-    // combine the four bytes (two words) into a long integer
-    // this is NTP time (seconds since Jan 1 1900):
-    unsigned long secsSince1900 = highWord << 16 | lowWord;
-    Serial.print("Seconds since Jan 1 1900 = ");
-    Serial.println(secsSince1900);
-
-    // now convert NTP time into everyday time:
-    Serial.print("Unix time = ");
-    // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-    const unsigned long seventyYears = 2208988800UL;
-    // subtract seventy years:
-    unsigned long epoch = secsSince1900 - seventyYears;
-    // print Unix time:
-    Serial.println(epoch);
-
-
-    // print the hour, minute and second:
-    Serial.print("The UTC time is ");       // UTC is the time at Greenwich Meridian (GMT)
-    Serial.print((epoch  % 86400L) / 3600); // print the hour (86400 equals secs per day)
-    Serial.print(':');
-    if (((epoch % 3600) / 60) < 10) {
-      // In the first 10 minutes of each hour, we'll want a leading '0'
-      Serial.print('0');
-    }
-    Serial.print((epoch  % 3600) / 60); // print the minute (3600 equals secs per minute)
-    Serial.print(':');
-    if ((epoch % 60) < 10) {
-      // In the first 10 seconds of each minute, we'll want a leading '0'
-      Serial.print('0');
-    }
-    Serial.println(epoch % 60); // print the second
-  }
-  // wait ten seconds before asking for the time again
-  delay(10000);
-  Ethernet.maintain();
-}
 }
