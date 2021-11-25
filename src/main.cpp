@@ -43,7 +43,7 @@ int16_t get_temperature() {
 byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
-IPAddress ip(192, 168, 1, 177);
+IPAddress ip(192, 168, 0, 177);
 
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
@@ -81,19 +81,19 @@ void turnTemperatureDown(EthernetClient client)
 }
 
 //time
-void getTimer(EthernetClient client)
-{
-  int timer = digitalRead(Udp.parsePacket());
-  Serial.println(timer);
-  if(timer == 1)
-  {
-    return client.print("testher");
-  }
-  else
-  {
-    return timeServer;
-  }
-}
+// void getTimer(EthernetClient client)
+// {
+//   int timer = digitalRead(Udp.parsePacket());
+//   Serial.println(timer);
+//   if(timer == 1)
+//   {
+//     return client.print("testher");
+//   }
+//   else
+//   {
+//     return timeServer;
+//   }
+// }
 
 // send an NTP request to the time server at the given address
 void sendNTPpacket(const char * address) {
@@ -254,7 +254,7 @@ void loop() {
     Serial.println(epoch % 60); // print the second
   }
   // wait ten seconds before asking for the time again
-  delay(10000);
+ // delay(10000);
   Ethernet.maintain();
     while (client.connected()) {
       if (client.available()) {
