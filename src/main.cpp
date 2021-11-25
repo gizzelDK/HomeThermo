@@ -6,8 +6,8 @@
 #define DS1621_ADDRESS 0x48
 
 /// Temperature pins
-int upTemp = A4;
-int downTemp = A5;
+int upTemp = A5;
+int downTemp = A4;
 
 /// Http req holder
 String HTTP_req;
@@ -41,22 +41,8 @@ IPAddress ip(192, 168, 0, 177);
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
-void turnTemperatureUp(){
-  digitalWrite(upTemp, HIGH);
-  delay(1000);
-  digitalWrite(upTemp, LOW);
-  Serial.println("Turned heat up");
-}
-void turnTemperatuupTempown(){
-  digitalWrite(downTemp, HIGH);
-  delay(1000);
-  digitalWrite(downTemp, LOW);
-  Serial.println("Turned heat down");
-}
-
-
 /// Get ledchange handling
-void ledChangeStatus(EthernetClient client)
+void turnTemperatureUp(EthernetClient client)
 {
   int state = digitalRead(upTemp);
   Serial.println(state);
@@ -65,21 +51,26 @@ void ledChangeStatus(EthernetClient client)
     client.print("OFF");
   }
   else {
+    digitalWrite(downTemp, LOW);
     digitalWrite(upTemp, HIGH);
-    client.print("ON");
+    client.print("Heating");
   }
 }
-void ajaxRequest(EthernetClient client)
+void turnTemperatureDown(EthernetClient client)
 {
-  for (int analogChannel = 0; analogChannel < 6; analogChannel++) {
-    int sensorReading = analogRead(analogChannel);
-    client.print("analog input ");
-    client.print(analogChannel);
-    client.print(" is ");
-    client.print(sensorReading);
-    client.println("<br />");
+  int state = digitalRead(downTemp);
+  Serial.println(state);
+  if (state == 1) {
+    digitalWrite(downTemp, LOW);
+    client.print("OFF");
+  }
+  else {
+    digitalWrite(upTemp, LOW);
+    digitalWrite(downTemp, HIGH);
+    client.print("Cooling");
   }
 }
+
 void setup() {
     Wire.begin();
     Wire.beginTransmission(DS1621_ADDRESS);
@@ -189,15 +180,16 @@ void loop() {
           client.println("Refresh: 5");  // refresh the page automatically every 5 sec
           client.println();
           Serial.println(HTTP_req);
-            if (HTTP_req.indexOf("ajaxrefresh") >= 0 ) {
+           if (HTTP_req.indexOf("turnTemperatureUp") >= 0 ) {
             // read switch state and analog input
-            ajaxRequest(client);
+            turnTemperatureUp(client);
             break;
-          } else if (HTTP_req.indexOf("ledstatus") >= 0 ) {
+          }else if (HTTP_req.indexOf("turnTemperatureDown") >= 0 ) {
             // read switch state and analog input
-            ledChangeStatus(client);
+            turnTemperatureDown(client);
             break;
-          }else{
+          }
+          else{
 
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
@@ -205,8 +197,9 @@ void loop() {
           client.println("<head>");
           client.println("<script type=\"text/javascript\">");///////// Action goees here
           
-          
           client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here
+          client.println("function turnTemperatureDown(){console.log(true)}");///////// Action goees here
+          
           
           client.println("</script>");///////// Action goees here
            
@@ -218,24 +211,25 @@ void loop() {
 
           client.println("<body>");
             client.println("<h1>");
-            client.println("Gyygle Thermo");
+            client.println("Smart Thermo");
             client.println("</h1>");
 
-            client.println("<div><span id=\"led_status\">");
+            client.println("<div><span id=\"up_Temp\">");
             if(digitalRead(upTemp) == 1)
-             client.println("On");
+             client.println("Heating");
             else
               client.println("Off");
-            client.println("</span> | <button onclick=\"changeLEDStatus()\">Change Status</button> </div>");
-           /////// VAR undefined
-            client.println("<div><span id=\"analoge_data\"></span> </div>");
+            client.println("</span> | <button onclick=\"turnLedUp()\">Turn up temperature</button> </div>");
+            client.println("<div><span id=\"down_Temp\">");
 
-            client.println("<button onclick=\"turnTemperatureUp()\">");// Inline script with ajax call?
-            client.println("Turn up the Heat");
-            client.println("</button>");
-            client.println("<button onclick=\"turnTemperatuupTempown\">");// Inline script with ajax call?
-            client.println("Turn down the Heat");
-            client.println("</button>");
+            if(digitalRead(downTemp) == 1){
+             client.println("Cooling");
+            } else{
+              client.println("Off");
+            }
+
+            client.println("</span> | <button onclick=\"turnLedDown()\">Turn down temperature</button> </div>");
+
             client.println("<br />");
           // output the value of temperature////////////////////
             client.print("Farenhiet = ");
@@ -255,10 +249,9 @@ void loop() {
             client.println("console.log(this.reesponseText)");
             client.println("document.getElementById(\"analoge_data\").innerHTML = this.responseText;");
             client.println("}}}}");
-            client.println("request.open(\"GET\", \"ajaxrefresh\" + nocache, true);");
-            client.println("request.send(null);");
-            client.println("}, 5000);");
-            client.println("function changeLEDStatus() {");
+            client.println("}, 1000);");
+            ////// Function to toggle Heating
+            client.println("function turnLedUp() {");
             client.println("nocache = \"&nocache=\" + Math.random() * 10;");
             client.println("var request = new XMLHttpRequest();");
             client.println("request.onreadystatechange = function() {");
@@ -266,9 +259,23 @@ void loop() {
             client.println("if (this.status == 200) {");
             client.println("if (this.responseText != null) {");
             client.println("console.log(this.reesponseText)");///// DEBUG
-            client.println("document.getElementById(\"led_status\").innerHTML = this.responseText;");
+            client.println("document.getElementById(\"up_Temp\").innerHTML = this.responseText;");
             client.println("}}}}");
-            client.println("request.open(\"GET\", \"?ledstatus=1\" + nocache, true);");
+            client.println("request.open(\"GET\", \"?turnTemperatureUp=1\" + nocache, true);");
+            client.println("request.send(null);");
+            client.println("}");
+           ///// Function to toggle Cooling
+            client.println("function turnLedDown() {");
+            client.println("nocache = \"&nocache=\" + Math.random() * 10;");
+            client.println("var request = new XMLHttpRequest();");
+            client.println("request.onreadystatechange = function() {");
+            client.println("if (this.readyState == 4) {");
+            client.println("if (this.status == 200) {");
+            client.println("if (this.responseText != null) {");
+            client.println("console.log(this.reesponseText)");///// DEBUG
+            client.println("document.getElementById(\"down_Temp\").innerHTML = this.responseText;");
+            client.println("}}}}");
+            client.println("request.open(\"GET\", \"?turnTemperatureDown=1\" + nocache, true);");
             client.println("request.send(null);");
             client.println("}");
             client.println("</script>");
