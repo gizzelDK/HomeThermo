@@ -14,6 +14,8 @@ String HTTP_req;
 /// Char arrays til temperatur bytes    
 char c_buffer[8], f_buffer[8];
 
+String nowTime = "Klokken";
+
 int16_t get_temperature() {
   Wire.beginTransmission(DS1621_ADDRESS); // connect to DS1621 (send DS1621 address)
   Wire.write(0xAA);                       // read temperature command
@@ -212,6 +214,10 @@ void loop() {
           client.println("<body>");
             client.println("<h1>");
             client.println("Smart Thermo");
+
+            client.println("<span> id=\"now_time\"");
+            client.print(nowTime);
+            client.println("</span>");
             client.println("</h1>");
 
             client.println("<div><span id=\"up_Temp\">");
