@@ -215,7 +215,7 @@ void loop() {
             client.println("<h1>");
             client.println("Smart Thermo");
 
-            client.println("<span> id=\"now_time\"");
+            client.println("<span id=\"now_time\">");
             client.print(nowTime);
             client.println("</span>");
             client.println("</h1>");
