@@ -9,6 +9,10 @@
 /// Temperature pins
 int upTemp = A5;
 int downTemp = A4;
+/// Temperature settings/////////////////////////////////////////////////////
+enum TemperatureSetting { Cold, Set1, Set2, Set3, Set4, Set5, Set6};
+TemperatureSetting tsetting = Cold;
+
 
 const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
 unsigned int localPort = 8888;
@@ -50,35 +54,62 @@ IPAddress ip(192, 168, 0, 177);
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
-/// Get ledchange handling
-void turnTemperatureUp(EthernetClient client)
+
+void turnTemperatureUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
 {
-  int state = digitalRead(upTemp);
-  Serial.println(state);
-  if (state == 1) {
-    digitalWrite(upTemp, LOW);
-    client.print("OFF");
-  }
-  else {
-    digitalWrite(downTemp, LOW);
-    digitalWrite(upTemp, HIGH);
-    client.print("Heating");
+ switch(tsetting) {
+              case 0: client.print("1");tsetting = Set1; break;
+              case 1: client.print("2");tsetting = Set2; break;
+              case 2: client.print("3");tsetting = Set3; break;
+              case 3: client.print("4");tsetting = Set4; break;
+              case 4: client.print("5");tsetting = Set5; break;
+              case 5: client.print("6");tsetting = Set6; break;
+              case 6: client.print("6");tsetting = Set6; break;
+              default: client.print("Your heating system might be broken");
   }
 }
 void turnTemperatureDown(EthernetClient client)
 {
-  int state = digitalRead(downTemp);
-  Serial.println(state);
-  if (state == 1) {
-    digitalWrite(downTemp, LOW);
-    client.print("OFF");
-  }
-  else {
-    digitalWrite(upTemp, LOW);
-    digitalWrite(downTemp, HIGH);
-    client.print("Cooling");
+ switch(tsetting) {
+              case 0: client.print("Cold");tsetting = Cold; break;
+              case 1: client.print("Cold");tsetting = Cold; break;
+              case 2: client.print("1");tsetting = Set1; break;
+              case 3: client.print("2");tsetting = Set2; break;
+              case 4: client.print("3");tsetting = Set3; break;
+              case 5: client.print("4");tsetting = Set4; break;
+              case 6: client.print("5");tsetting = Set5; break;
+              default: client.print("Your heating system might be broken");
   }
 }
+/// Get ledchange handling //// de her skal være én void adjustTemp()betinges af targetTemperature og newTemperature - skru op, hvis for koldt og ned...
+// void turnTemperatureUp(EthernetClient client)
+// {
+//   int state = digitalRead(upTemp);
+//   Serial.println(state);
+//   if (state == 1) {
+//     digitalWrite(upTemp, LOW);
+//     client.print("OFF");
+//   }
+//   else {
+//     digitalWrite(downTemp, LOW);
+//     digitalWrite(upTemp, HIGH);
+//     client.print("Heating");
+//   }
+// }
+// void turnTemperatureDown(EthernetClient client)
+// {
+//   int state = digitalRead(downTemp);
+//   Serial.println(state);
+//   if (state == 1) {
+//     digitalWrite(downTemp, LOW);
+//     client.print("OFF");
+//   }
+//   else {
+//     digitalWrite(upTemp, LOW);
+//     digitalWrite(downTemp, HIGH);
+//     client.print("Cooling");
+//   }
+// }
 
 //time
 // void getTimer(EthernetClient client)
@@ -126,7 +157,7 @@ void setup() {
     Wire.beginTransmission(DS1621_ADDRESS);
     Wire.write(0xEE);
     Wire.endTransmission();
-  pinMode(20, OUTPUT);
+     pinMode(20, OUTPUT);
 
     pinMode(upTemp, OUTPUT); 
     pinMode(downTemp, OUTPUT); 
@@ -135,7 +166,6 @@ void setup() {
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
-  Serial.println("Ethernet WebServer Example");
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -160,7 +190,7 @@ void setup() {
 
 void loop() {
   ////Temperature reading
-  delay(1000);    // wait a second
+  delay(1000);    // wait a second //////////////////måske ikke nødvendigt mere?
   // get temperature in tenths °C
   int16_t c_temp = get_temperature();
   // convert tenths °C to tenths °F
@@ -290,13 +320,13 @@ void loop() {
           client.println("<head>");
           client.println("<script type=\"text/javascript\">");///////// Action goees here
           
-          client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here
+          client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here////bruges ikke i øjeblikket
           client.println("function turnTemperatureDown(){console.log(true)}");///////// Action goees here
 
           
 
           
-          client.println("</script>");///////// Action goees here
+          client.println("</script>");///////// Action ends here
            
           client.println("<style>");///////// Styling goees here
           client.print("*{background-color:#000;color:hotpink;}h1{color:#00F}");
@@ -309,22 +339,38 @@ void loop() {
             client.println("Smart Thermo");
             client.println(newtime);
             client.println("</h1>");
+            client.println("<div><span id=\"temp_setting\">");
+            client.print("Current temperature setting: ");
+            switch(tsetting) {
+              case 0: client.println("Cold"); break;
+              case 1: client.println("1"); break;
+              case 2: client.println("2"); break;
+              case 3: client.println("3"); break;
+              case 4: client.println("4"); break;
+              case 5: client.println("5"); break;
+              case 6: client.println("6"); break;
+              default: client.println("Your heating system might be broken");
+}
+            client.println("</div></span>");///////////////////////////////////////////////////
 
-            client.println("<div><span id=\"up_Temp\">");
-            if(digitalRead(upTemp) == 1)
-             client.println("Heating");
-            else
-              client.println("Off");
-            client.println("</span> | <button onclick=\"turnLedUp()\">Turn up temperature</button> </div>");
-            client.println("<div><span id=\"down_Temp\">");
 
-            if(digitalRead(downTemp) == 1){
-             client.println("Cooling");
-            } else{
-              client.println("Off");
-            }
 
-            client.println("</span> | <button onclick=\"turnLedDown()\">Turn down temperature</button> </div>");
+            // client.println("<div><span id=\"up_Temp\">");
+            // if(digitalRead(upTemp) == 1)
+            //  client.println("Heating");
+            // else
+            //   client.println("Off");
+            // client.println("</span>");
+            client.println("<button onclick=\"turnLedUp()\">Turn up temperature</button> </div>");
+            // client.println("<div><span id=\"down_Temp\">");
+
+            // if(digitalRead(downTemp) == 1){
+            //  client.println("Cooling");
+            // } else{
+            //   client.println("Off");
+            // }
+            //client.println("</span>");
+            client.println("<button onclick=\"turnLedDown()\">Turn down temperature</button> </div>");
 
             client.println("<br />");
           // output the value of temperature////////////////////
@@ -355,7 +401,7 @@ void loop() {
             client.println("if (this.status == 200) {");
             client.println("if (this.responseText != null) {");
             client.println("console.log(this.reesponseText)");///// DEBUG
-            client.println("document.getElementById(\"up_Temp\").innerHTML = this.responseText;");
+            client.println("document.getElementById(\"temp_setting\").innerHTML = this.responseText;");
             client.println("}}}}");
             client.println("request.open(\"GET\", \"?turnTemperatureUp=1\" + nocache, true);");
             client.println("request.send(null);");
@@ -369,7 +415,7 @@ void loop() {
             client.println("if (this.status == 200) {");
             client.println("if (this.responseText != null) {");
             client.println("console.log(this.reesponseText)");///// DEBUG
-            client.println("document.getElementById(\"down_Temp\").innerHTML = this.responseText;");
+            client.println("document.getElementById(\"temp_setting\").innerHTML = this.responseText;");
             client.println("}}}}");
             client.println("request.open(\"GET\", \"?turnTemperatureDown=1\" + nocache, true);");
             client.println("request.send(null);");
