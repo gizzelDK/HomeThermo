@@ -5,8 +5,14 @@
 /// Temperature sampling and control variables
 #define DS1621_ADDRESS 0x48
 
+/// Temperature pins
 int upTemp = A4;
 int downTemp = A5;
+
+/// Http req holder
+String HTTP_req;
+/// Char arrays til temperatur bytes    
+char c_buffer[8], f_buffer[8];
 
 int16_t get_temperature() {
   Wire.beginTransmission(DS1621_ADDRESS); // connect to DS1621 (send DS1621 address)
@@ -41,14 +47,39 @@ void turnTemperatureUp(){
   digitalWrite(upTemp, LOW);
   Serial.println("Turned heat up");
 }
-void turnTemperatureDown(){
+void turnTemperatuupTempown(){
   digitalWrite(downTemp, HIGH);
   delay(1000);
   digitalWrite(downTemp, LOW);
   Serial.println("Turned heat down");
 }
-char c_buffer[8], f_buffer[8]; // Char arrays til temperatur bytes
 
+
+/// Get ledchange handling
+void ledChangeStatus(EthernetClient client)
+{
+  int state = digitalRead(upTemp);
+  Serial.println(state);
+  if (state == 1) {
+    digitalWrite(upTemp, LOW);
+    client.print("OFF");
+  }
+  else {
+    digitalWrite(upTemp, HIGH);
+    client.print("ON");
+  }
+}
+void ajaxRequest(EthernetClient client)
+{
+  for (int analogChannel = 0; analogChannel < 6; analogChannel++) {
+    int sensorReading = analogRead(analogChannel);
+    client.print("analog input ");
+    client.print(analogChannel);
+    client.print(" is ");
+    client.print(sensorReading);
+    client.println("<br />");
+  }
+}
 void setup() {
     Wire.begin();
     Wire.beginTransmission(DS1621_ADDRESS);
@@ -134,7 +165,7 @@ void loop() {
    Serial.println(c_buffer);
   Serial.println(f_buffer);  // print f_buffer (temperature in °F)
   
-  // listen for incoming clients
+  //////// listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
     Serial.println("new client");
@@ -143,7 +174,10 @@ void loop() {
     while (client.connected()) {
       if (client.available()) {
         char c = client.read();
-        Serial.write(c);
+         if( HTTP_req.length() < 120) 
+           HTTP_req += c; // save the HTTP request 1 char at a time 
+           Serial.write(c); 
+
         // if you've gotten to the end of the line (received a newline
         // character) and the line is blank, the http request has ended,
         // so you can send a reply
@@ -154,17 +188,29 @@ void loop() {
           client.println("Connection: close");  // the connection will be closed after completion of the response
           client.println("Refresh: 5");  // refresh the page automatically every 5 sec
           client.println();
+          Serial.println(HTTP_req);
+            if (HTTP_req.indexOf("ajaxrefresh") >= 0 ) {
+            // read switch state and analog input
+            ajaxRequest(client);
+            break;
+          } else if (HTTP_req.indexOf("ledstatus") >= 0 ) {
+            // read switch state and analog input
+            ledChangeStatus(client);
+            break;
+          }else{
+
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
           
           client.println("<head>");
-          client.println("<style>");///////// Styling goees here
           client.println("<script type=\"text/javascript\">");///////// Action goees here
           
           
           client.println("function turnTemperatureUp(){console.log(true)}");///////// Action goees here
           
           client.println("</script>");///////// Action goees here
+           
+          client.println("<style>");///////// Styling goees here
           client.print("*{background-color:#000;color:hotpink;}h1{color:#00F}");
           client.println("</style>");
           
@@ -174,22 +220,63 @@ void loop() {
             client.println("<h1>");
             client.println("Gyygle Thermo");
             client.println("</h1>");
-            client.println("<button onclick=\"turnTemperatureUp\">");// Inline script with ajax call?
+
+            client.println("<div><span id=\"led_status\">");
+            if(digitalRead(upTemp) == 1)
+             client.println("On");
+            else
+              client.println("Off");
+            client.println("</span> | <button onclick=\"changeLEDStatus()\">Change Status</button> </div>");
+           /////// VAR undefined
+            client.println("<div><span id=\"analoge_data\"></span> </div>");
+
+            client.println("<button onclick=\"turnTemperatureUp()\">");// Inline script with ajax call?
             client.println("Turn up the Heat");
             client.println("</button>");
-            client.println("<button onclick=\"turnTemperatureDown\">");// Inline script with ajax call?
+            client.println("<button onclick=\"turnTemperatuupTempown\">");// Inline script with ajax call?
             client.println("Turn down the Heat");
             client.println("</button>");
             client.println("<br />");
-          // output the value of each analog input pin////////////////////
+          // output the value of temperature////////////////////
             client.print("Farenhiet = ");
             client.println(f_buffer);
             client.print("Celcius = ");
             client.println(c_buffer);
             client.println("<br />");
+
+              /////JS
+            client.println("<script>window.setInterval(function(){");
+            client.println("nocache = \"&nocache=\" + Math.random() * 10;");
+            client.println("var request = new XMLHttpRequest();");
+            client.println("request.onreadystatechange = function() {");
+            client.println("if (this.readyState == 4) {");
+            client.println("if (this.status == 200) {");
+            client.println("if (this.responseText != null) {");
+            client.println("console.log(this.reesponseText)");
+            client.println("document.getElementById(\"analoge_data\").innerHTML = this.responseText;");
+            client.println("}}}}");
+            client.println("request.open(\"GET\", \"ajaxrefresh\" + nocache, true);");
+            client.println("request.send(null);");
+            client.println("}, 5000);");
+            client.println("function changeLEDStatus() {");
+            client.println("nocache = \"&nocache=\" + Math.random() * 10;");
+            client.println("var request = new XMLHttpRequest();");
+            client.println("request.onreadystatechange = function() {");
+            client.println("if (this.readyState == 4) {");
+            client.println("if (this.status == 200) {");
+            client.println("if (this.responseText != null) {");
+            client.println("console.log(this.reesponseText)");///// DEBUG
+            client.println("document.getElementById(\"led_status\").innerHTML = this.responseText;");
+            client.println("}}}}");
+            client.println("request.open(\"GET\", \"?ledstatus=1\" + nocache, true);");
+            client.println("request.send(null);");
+            client.println("}");
+            client.println("</script>");
+
             client.println("</body>");
             client.println("</html>");
-          break;
+            break;
+          }
         }
         if (c == '\n') {
           // you're starting a new line
@@ -204,6 +291,7 @@ void loop() {
     delay(1);
     // close the connection:
     client.stop();
+    HTTP_req ="";
     Serial.println("client disconnected");
   }
 }
