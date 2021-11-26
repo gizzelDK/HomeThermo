@@ -12,7 +12,7 @@ int downTemp = A4;
 /// Temperature settings/////////////////////////////////////////////////////
 enum TemperatureSetting { Cold, Set1, Set2, Set3, Set4, Set5, Set6};
 TemperatureSetting tsetting = Cold;
-int targetTemperature = 0;
+float targetTemperature = 21.00;
 
 const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
 unsigned int localPort = 8888;
@@ -57,17 +57,15 @@ EthernetServer server(80);
 
 void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
 {
-  String testing = HTTP_req.substring(HTTP_req.indexOf("=")+1, HTTP_req.indexOf("=")+2);
-  Serial.println("----------------- LOOK AT THIS ----------"+testing); /// DEBUG
- switch(tsetting) {
-              case 0: client.print("1");tsetting = Set1; break;
-              case 1: client.print("2");tsetting = Set2; break;
-              case 2: client.print("3");tsetting = Set3; break;
-              case 3: client.print("4");tsetting = Set4; break;
-              case 4: client.print("5");tsetting = Set5; break;
-              case 5: client.print("6");tsetting = Set6; break;
-              case 6: client.print("6");tsetting = Set6; break;
-              default: client.print("Your heating system might be broken");
+  switch(tsetting) {
+                case 0: client.print("1");tsetting = Set1; break;
+                case 1: client.print("2");tsetting = Set2; break;
+                case 2: client.print("3");tsetting = Set3; break;
+                case 3: client.print("4");tsetting = Set4; break;
+                case 4: client.print("5");tsetting = Set5; break;
+                case 5: client.print("6");tsetting = Set6; break;
+                case 6: client.print("6");tsetting = Set6; break;
+                default: client.print("Your heating system might be broken");
   }
 }
 void settingDown(EthernetClient client)
@@ -84,34 +82,48 @@ void settingDown(EthernetClient client)
   }
 }
 /// Get ledchange handling //// de her skal være én void adjustTemp()betinges af targetTemperature og newTemperature - skru op, hvis for koldt og ned...
-void adjustTemperature()
+void adjustTemperature(int m16)
 {
-
-  int measured = get_temperature();
+ float measured = m16 / 10.00;
+  Serial.println("---------------------------------------");
+  Serial.println(measured);
+  Serial.println("---------------------------------------");
   /// doSomething = target - measure
-  int doSomething = measured - targetTemperature;
-  /// state= lukker varme ind/ikke
-  int state = digitalRead(upTemp);
-  Serial.println(state);
-
+  float doSomething = measured - targetTemperature;
+  /// state= decides if heat open/close signal must be send
+  int state = 0;
+  Serial.println("---------------------------------------");
+  Serial.println(doSomething);
+  Serial.println("---------------------------------------");
   /// if doSomething !=0
-if(doSomething != 0){
-  /// if doSomething > 0 luk mere varme ind
+  if(doSomething != 0){
+    /// if doSomething > 0 luk mindre varme ind
+    if(doSomething < 0){
+      state = digitalRead(upTemp);
+      if (state == 1) {
+        // already running, so delay and turn off
+        digitalWrite(downTemp, LOW);
+        digitalWrite(upTemp, LOW);
+      }
+      else {
+        digitalWrite(downTemp, LOW);
+        digitalWrite(upTemp, HIGH);
+      }
+    }
+    /// if doSomething < 0 luk mere varme ind
   if(doSomething > 0){
-    if (state == 1) {
-      digitalWrite(upTemp, LOW);
-
+      state = digitalRead(downTemp);
+      if (state == 1) {
+        // already running, so delay and turn off
+        digitalWrite(upTemp, LOW);
+        digitalWrite(downTemp, LOW);
+      }
+      else {
+        digitalWrite(upTemp, LOW);
+        digitalWrite(downTemp, HIGH);
+      }
     }
-    else {
-      digitalWrite(downTemp, LOW);
-      digitalWrite(upTemp, HIGH);
-
-    }
-
   }
-
-}
-  /// if doSomething < 0 luk mindre varme ind
 }
 
 // send an NTP request to the time server at the given address
@@ -136,8 +148,8 @@ void sendNTPpacket(const char * address) {
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
 }
-///// DS1621 setup
 void setup() {
+///// DS1621 setup
     Wire.begin();
     Wire.beginTransmission(DS1621_ADDRESS);
     Wire.write(0xAC);
@@ -149,27 +161,27 @@ void setup() {
 
     pinMode(upTemp, OUTPUT); 
     pinMode(downTemp, OUTPUT); 
-  // Open serial communications and wait for port to open:
+  /// Open serial communications and wait for port to open for debugging purposes:
   Serial.begin(115200);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
-  // start the Ethernet connection and the server:
+  /// start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
 
-  // Check for Ethernet hardware present
+  /// Check for Ethernet hardware present
   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
     Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
     while (true) {
-      delay(1); // do nothing, no point running without Ethernet hardware
+      delay(1); // do nothing, no point running without Ethernet hardware ///////////////////// Man kunne overveje et break; i stedet, så den får chancen igen
     }
   }
   if (Ethernet.linkStatus() == LinkOFF) {
     Serial.println("Ethernet cable is not connected.");
   }
   Udp.begin(localPort);
-  // start the server
+  ///start the server
   server.begin();
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP()); //////Debug
@@ -179,6 +191,7 @@ void setup() {
 void loop() {
   ////Temperature reading
   delay(1000);    // wait a second //////////////////måske ikke nødvendigt mere?
+
   // get temperature in tenths °C
   int16_t c_temp = get_temperature();
   // convert tenths °C to tenths °F
@@ -220,7 +233,7 @@ void loop() {
 
    Serial.println(c_buffer);
   Serial.println(f_buffer);  // print f_buffer (temperature in °F)
-  
+  adjustTemperature(c_temp);
   //////// listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
@@ -249,27 +262,24 @@ void loop() {
     // subtract seventy years:
     unsigned long epoch = secsSince1900 - seventyYears;
     // print the hour, minute and second:
-    Serial.print((epoch  % 86400L) / 3600); // print the hour (86400 equals secs per day)
+    
     newtime = "";
     newtime = (epoch  % 86400L) / 3600;
     newtime += ":";
-    Serial.print(':');
+  
     if (((epoch % 3600) / 60) < 10) {
       // In the first 10 minutes of each hour, we'll want a leading '0'
       newtime += "0";
-      Serial.print('0');
     }
     newtime += (epoch  % 3600) / 60;
-    Serial.print((epoch  % 3600) / 60); // print the minute (3600 equals secs per minute)
+  
     newtime += ":";
-    Serial.print(':');
+  
     if ((epoch % 60) < 10) {
       // In the first 10 seconds of each minute, we'll want a leading '0'
-      Serial.print('0');
       newtime += "0";
     }
     newtime += epoch % 60;
-    Serial.println(epoch % 60); // print the second
   }
   // wait ten seconds before asking for the time again
  // delay(10000);
