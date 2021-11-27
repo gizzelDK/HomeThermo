@@ -16,11 +16,13 @@ int downTemp = A4;
 enum TemperatureSetting { Cold, Set1, Set2, Set3, Set4, Set5, Set6};
 TemperatureSetting tsetting = Cold;
 
+TimeSchedule pickchprogram = 0;
+
 float targetTemperature = 21.00;
 
 const char* PARAM_INPUT_1 = "input1";
 
-
+int chosenProgramme = 0; // skal rettes ved samlfletning af branches
 
 /// timeSchedule class
 class TimeSchedule{
@@ -39,7 +41,6 @@ class TimeSchedule{
 };
 /// collection of time schedules
 list<TimeSchedule> schedules;
-
 
 const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
 unsigned int localPort = 8888;
@@ -76,8 +77,8 @@ byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 
-//IPAddress ip(192, 168, 1, 177); // IP Adresse for webserveren.
-IPAddress ip(192, 168, 0, 177); // IP Adresse for webserveren.
+IPAddress ip(192, 168, 1, 177); // IP Adresse for webserveren.
+//IPAddress ip(192, 168, 0, 177); // IP Adresse for webserveren.
 
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
@@ -98,6 +99,17 @@ void factorySettings(){
     schedules.push_back(spareTidskema);
     schedules.push_back(comfortTidskema);
     schedules.push_back(nightTidskema);
+}
+///Picks the choosen temperature mode either spar, komfort or night
+void pickchosenProgramme()
+{
+  //TimeSchedule
+  switch(pickchprogram) {
+                case 0: client.print("spar");pickchprogram = spareTidskema; break;
+                case 1: client.print("comfort");pickchprogram = comfortTidskema; break;
+                case 2: client.print("night");pickchprogram = nightTidskema; break;
+                default: client.print("No program choosen - something is very wrong") 
+
 }
 
 /// settingUp function
@@ -258,7 +270,7 @@ void setup() {
       Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
      break;
     }
-    
+
 
   }
    /// start the Ethernet connection and the server:
@@ -493,7 +505,11 @@ void loop() {
               client.print(i->setting);
               client.print("</li>");
               }
-
+              //mark choosen program
+              client.print("<h2> Du kører programmet: </h2>")
+              client.print("<div>")
+              client.print(chosenProgramme);
+              client.print("</div>")
             client.print("</ul>");
             client.print("</div>");
 
