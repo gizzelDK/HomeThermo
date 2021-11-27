@@ -97,7 +97,9 @@ void factorySettings(){
     schedules.push_back(comfortTidskema);
     schedules.push_back(nightTidskema);
 }
-
+void runCurrentSchedule(){
+  
+}
 /// settingUp function
 void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
 {
