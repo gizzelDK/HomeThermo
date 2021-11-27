@@ -2,6 +2,9 @@
 #include <Ethernet.h>
 #include <Wire.h>
 #include <EthernetUdp.h>
+#include <list>
+#include <iostream>
+using namespace std;
 
 /// Temperature sampling and control variables
 #define DS1621_ADDRESS 0x48
@@ -9,14 +12,33 @@
 /// Temperature pins
 int upTemp = A5;
 int downTemp = A4;
-/// Temperature settings/////////////////////////////////////////////////////
+/// Temperature settings
 enum TemperatureSetting { Cold, Set1, Set2, Set3, Set4, Set5, Set6};
 TemperatureSetting tsetting = Cold;
 
 float targetTemperature = 21.00;
 
-
 const char* PARAM_INPUT_1 = "input1";
+
+
+
+/// timeSchedule class
+class TimeSchedule{
+  public:
+    String name;
+    int fromTime;
+    int toTime;
+    TemperatureSetting setting;
+
+    TimeSchedule(String name, int fromTime,int toTime, TemperatureSetting setting){
+        this->name = name;
+        this->fromTime = fromTime;
+        this->toTime = toTime;
+        this->setting = setting;
+    }
+};
+/// collection of time schedules
+list<TimeSchedule> schedules;
 
 
 const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
@@ -54,15 +76,31 @@ byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 
-IPAddress ip(192, 168, 1, 177); // IP Adresse for webserveren.
+//IPAddress ip(192, 168, 1, 177); // IP Adresse for webserveren.
+IPAddress ip(192, 168, 0, 177); // IP Adresse for webserveren.
 
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
+/// createSchedule function
+void createSchedule(String _name, int _fromTime, int _toTime,TemperatureSetting _setting){
+  TimeSchedule nyt(_name, _fromTime,_toTime,_setting);
+  schedules.push_back(nyt);
+}
+/// Factory presets for time schedules
+void factorySettings(){
+  TimeSchedule spareTidskema("spar", 800, 1400, Cold);
+  TimeSchedule comfortTidskema("comfort", 1400, 2300, Set3);
+  TimeSchedule nightTidskema("night", 2300, 700, Set2);
 
+    schedules.push_back(spareTidskema);
+    schedules.push_back(comfortTidskema);
+    schedules.push_back(nightTidskema);
+}
 
+/// settingUp function
 void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
 {
   switch(tsetting) {
@@ -76,6 +114,7 @@ void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og re
                 default: client.print("Your heating system might be broken");
   }
 }
+/// settingDown function
 void settingDown(EthernetClient client)
 {
  switch(tsetting) {
@@ -131,7 +170,8 @@ void adjustTemperature(int m16)
         digitalWrite(downTemp, HIGH);
       }
     }
-
+  }
+}
 void editTime(EthernetClient client)//////////////Giver nyTid værdien fra HTTP.req og returnerer den redigeret tid. 
 {
   nyTid = HTTP_req.substring(HTTP_req.indexOf("=")+1, HTTP_req.indexOf("=")+5);
@@ -212,11 +252,16 @@ void setup() {
 
   /// Check for Ethernet hardware present
   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-
+    while (Ethernet.hardwareStatus() == EthernetNoHardware)
+    {
+      /// User gets a chance to plug a cable in
       Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
-   break;
+     break;
+    }
+    
+
   }
-   // start the Ethernet connection and the server:
+   /// start the Ethernet connection and the server:
   Ethernet.begin(mac, ip); //Start Ethernet, ved hjælp af mac og ip adresse.
   
   if (Ethernet.linkStatus() == LinkOFF) { //Hvis Ethernet kablet ikke kunne findes, så giver den besked over Serial monitoren. 
@@ -227,12 +272,14 @@ void setup() {
   server.begin();
   Serial.print("server is at ");
   Serial.println(Ethernet.localIP()); //////Debug
+  /// Load factory settings
+  factorySettings();
 }
 
 
 void loop() {
   ////Temperature reading
-  delay(1000);    // wait a second //////////////////måske ikke nødvendigt mere?
+  delay(1000);
 
   // get temperature in tenths °C
   int16_t c_temp = get_temperature();
@@ -427,11 +474,29 @@ void loop() {
             client.print("<form action=\"/get\">");
             client.print("<input type=\"text\" id=\"Spartid\" name=\"input1\">");
             client.print("<button onclick=\"editTime()\">Skift tid</button>");
-            client.print("</div>");
+            client.print("</form>");
 
             client.print("<div>");
             client.print(nyTid);
             client.print("</div>");
+            //// Tidsskemaer
+            client.print("<div>");
+            client.print("<ul>");
+              for(list<TimeSchedule>::iterator i = schedules.begin(); i != schedules.end(); i++){
+              client.print("<li>");
+              client.print(i->name);
+              client.print(" ");
+              client.print(i->fromTime);
+              client.print(" ");
+              client.print(i->toTime);
+              client.print(" ");
+              client.print(i->setting);
+              client.print("</li>");
+              }
+
+            client.print("</ul>");
+            client.print("</div>");
+
             
             /////JavaScript Sektion
             /// Refresh script
