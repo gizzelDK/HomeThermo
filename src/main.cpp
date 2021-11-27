@@ -505,7 +505,7 @@ void loop() {
               client.print(i->setting);
               client.print("</li>");
               }
-              //mark choosen program
+              /////mark choosen programet
               client.print("<h2> Du kører programmet: </h2>")
               client.print("<div>")
               client.print(chosenProgramme);
