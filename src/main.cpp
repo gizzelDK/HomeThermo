@@ -17,10 +17,9 @@ enum TemperatureSetting { Cold, Set1, Set2, Set3, Set4, Set5, Set6};
 TemperatureSetting tsetting = Cold;
 
 float targetTemperature = 21.00;
+int chosenProgramme = 0;
 
 const char* PARAM_INPUT_1 = "input1";
-
-
 
 /// timeSchedule class
 class TimeSchedule{
@@ -39,7 +38,6 @@ class TimeSchedule{
 };
 /// collection of time schedules
 list<TimeSchedule> schedules;
-
 
 const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
 unsigned int localPort = 8888;
@@ -258,8 +256,6 @@ void setup() {
       Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
      break;
     }
-    
-
   }
    /// start the Ethernet connection and the server:
   Ethernet.begin(mac, ip); //Start Ethernet, ved hjælp af mac og ip adresse.
