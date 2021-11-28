@@ -40,27 +40,39 @@ class TimeSchedule{
 /// en liste af TimeSchedule kaldet schedules
 list<TimeSchedule> schedules;
 
-const char timeServer[] = "time.nist.gov"; /// time.nist.gov NTP server
+/// time.nist.gov NTP server
+const char timeServer[] = "time.nist.gov"; 
 unsigned int localPort = 8888;
-const int NTP_PACKET_SIZE = 48; /// NTP time stamp er inde i de første 48 bytes af beskeden.
-String newtime = ""; /// newtime instalizeres
-String nyTid = ""; /// nyTid instalizeres
-byte packetBuffer[NTP_PACKET_SIZE]; ///buffer for at holde de indkommene og udgående pakker.
+/// NTP time stamp er inde i de første 48 bytes af beskeden.
+const int NTP_PACKET_SIZE = 48; 
+/// newtime instalizeres
+String newtime = ""; 
+/// nyTid instalizeres
+String nyTid = ""; 
+///buffer for at holde de indkommene og udgående pakker.
+byte packetBuffer[NTP_PACKET_SIZE]; 
+/// EN UDP instance som lader programmet sende og modtage pakker over UDP.
+EthernetUDP Udp; 
 
-EthernetUDP Udp; /// EN UDP instance som lader programmet sende og modtage pakker over UDP.
+/// Http req holder
+String HTTP_req; 
 
-String HTTP_req; /// Http req holder
-
-
-char c_buffer[8], f_buffer[8]; /// Char arrays til temperatur bytes    
+/// Char arrays til temperatur bytes    
+char c_buffer[8], f_buffer[8]; 
 
 int16_t get_temperature() {
-  Wire.beginTransmission(DS1621_ADDRESS); /// Forbind til DS1621 (Send en DS1621 adresse)
-  Wire.write(0xAA);                       /// Læs temperatur kommando
-  Wire.endTransmission(false);            /// Send en gentaget start condition.
-  Wire.requestFrom(DS1621_ADDRESS, 2);    /// Request 2 bytes fra DS1621 og release I2C bus ved slutningen af læsningen.
-  uint8_t t_msb = Wire.read();            /// Læs temperatur med MSB register.
-  uint8_t t_lsb = Wire.read();            /// Læs temperatur med LSB register.
+  /// Forbind til DS1621 (Send en DS1621 adresse)
+  Wire.beginTransmission(DS1621_ADDRESS); 
+  /// Læs temperatur kommando
+  Wire.write(0xAA);  
+  /// Send en gentaget start condition.                     
+  Wire.endTransmission(false);      
+  /// Request 2 bytes fra DS1621 og release I2C bus ved slutningen af læsningen.      
+  Wire.requestFrom(DS1621_ADDRESS, 2);   
+  /// Læs temperatur med MSB register. 
+  uint8_t t_msb = Wire.read(); 
+  /// Læs temperatur med LSB register.           
+  uint8_t t_lsb = Wire.read();         
  
   /// Udregner den fulde temperatur (i rå værdi).
   int16_t raw_t = (int8_t)t_msb << 1 | t_lsb >> 7;
@@ -75,7 +87,8 @@ byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 
-IPAddress ip(192, 168, 1, 177); /// IP Adresse for webserveren.
+/// IP Adresse for webserveren.
+IPAddress ip(192, 168, 1, 177); 
 
 /// Initializer Ethernet server library
 /// Med den IP address og port som du vil bruge
@@ -102,7 +115,7 @@ void factorySettings(){
 void runCurrentSchedule(String time){
   String tempString = "";
   int t4digit[4];
-  /// Henter tiden (time og minutter)
+    /// Henter tiden (time og minutter)
     for (unsigned int i = 0; i <=4; i++){
 
       Serial.print(time[i]);
@@ -211,7 +224,8 @@ void adjustTemperature(int m16)
 void editTime(EthernetClient client)
 {
   nyTid = HTTP_req.substring(HTTP_req.indexOf("=")+1, HTTP_req.indexOf("=")+5);
-  Serial.println("------------------------" + nyTid); /// Debugging for nyTid.
+  /// Debugging for nyTid.
+  Serial.println("------------------------" + nyTid); 
 }
 /// sætter tsetting ++/-- og returnerer den ny setting
 void turnTemperatureUp(EthernetClient client)
@@ -247,10 +261,14 @@ void sendNTPpacket(const char * address) {////////////// Sender en NTP request t
   memset(packetBuffer, 0, NTP_PACKET_SIZE);
   /// Initializer værdier som slaæ bruges til at forme NTP requesten.
   /// (se URL ovenover for detaljer for pakken).
-  packetBuffer[0] = 0b11100011;   /// LI, Version, Mode
-  packetBuffer[1] = 0;     /// Stratum, eller type of clock
-  packetBuffer[2] = 6;     /// Polling Interval
-  packetBuffer[3] = 0xEC;  /// Peer Clock Precision
+  /// LI, Version, Mode
+  packetBuffer[0] = 0b11100011;
+  /// Stratum, eller type of clock   
+  packetBuffer[1] = 0;     
+  /// Polling Interval
+  packetBuffer[2] = 6;     
+  /// Peer Clock Precision
+  packetBuffer[3] = 0xEC;  
   /// 8 bytes of zero for Root Delay og Root Dispersion
   packetBuffer[12]  = 49;
   packetBuffer[13]  = 0x4E;
@@ -263,7 +281,7 @@ void sendNTPpacket(const char * address) {////////////// Sender en NTP request t
   Udp.endPacket();
 }
 void setup() {
-///// DS1621 setup
+    ///// DS1621 setup
     Wire.begin();
     Wire.beginTransmission(DS1621_ADDRESS);
     Wire.write(0xAC);
@@ -277,7 +295,8 @@ void setup() {
     pinMode(downTemp, OUTPUT); 
   /// Åben serial kommunikationen og vent for porten til at åbne for debugging formål:
   Serial.begin(115200);
-  while (!Serial) {/// Vent på Serial port forbindes. Den skal kun bruge en native USB port. 
+  /// Vent på Serial port forbindes. Den skal kun bruge en native USB port. 
+  while (!Serial) {
     ; 
   }
 
@@ -294,9 +313,11 @@ void setup() {
     }
   }
    /// starter Ethernet forbindelsen og serveren:
-  Ethernet.begin(mac, ip); //Start Ethernet, ved hjælp af mac og ip adresse.
+   //Start Ethernet, ved hjælp af mac og ip adresse.
+  Ethernet.begin(mac, ip); 
   
-  if (Ethernet.linkStatus() == LinkOFF) { //Hvis Ethernet kablet ikke kunne findes, så giver den besked over Serial monitoren. 
+  //Hvis Ethernet kablet ikke kunne findes, så giver den besked over Serial monitoren. 
+  if (Ethernet.linkStatus() == LinkOFF) { 
     Serial.println("Ethernet cable is not connected.");
   }
   Udp.begin(localPort);
@@ -312,35 +333,37 @@ void setup() {
 void loop() {
   ////Temperaturen læses
   delay(1000);
-
-  int16_t c_temp = get_temperature(); ///Henter temperatur i tiendedele °C
-
-  int16_t f_temp = c_temp * 9/5 + 320 ; /// Konverter en tiendedele °C til en tiendedele °F
-
-    if(c_temp < 230) {   // Hvis temperaturen < 23 °C
-    c_temp = abs(c_temp);  // absolute value af c_temp
+  ///Henter temperatur i tiendedele °C
+  int16_t c_temp = get_temperature();
+  /// Konverter en tiendedele °C til en tiendedele °F
+  int16_t f_temp = c_temp * 9/5 + 320 ; 
+    /// Hvis temperaturen < 23 °C
+    if(c_temp < 230) {   
+    /// absolute value af c_temp
+    c_temp = abs(c_temp);  
     sprintf(c_buffer, "-%02u.%1u%cC", c_temp / 10, c_temp % 10, 223);
-    //digitalWrite(20,LOW);
   }
   else {
-    if (c_temp >= 250)    // Hvis temperaturen >= 100.0 °C
+    /// Hvis temperaturen >= 100.0 °C
+    if (c_temp >= 250)    
     {
       sprintf(c_buffer, "%03u.%1u%cC", c_temp / 10, c_temp % 10, 223);
-      //digitalWrite(20, HIGH);
     }
     else
     {
-      sprintf(c_buffer, " %02u.%1u%cC", c_temp / 10, c_temp % 10, 223); //sprintf = String print format
-      
+      sprintf(c_buffer, " %02u.%1u%cC", c_temp / 10, c_temp % 10, 223);      
     }
   }
-    if(f_temp < 0) {   // Hvis temperaturen < 0 °F
-    f_temp = abs(f_temp);  // absolute value
+    /// Hvis temperaturen < 0 °F
+    if(f_temp < 0) {   
+    /// absolute value
+    f_temp = abs(f_temp);  
     sprintf(f_buffer, "-%02u.%1u%cF", f_temp / 10, f_temp % 10, 223);
     digitalWrite(20, HIGH);
   }
   else {
-    if (f_temp >= 100) // Hvis temperaturen >= 100.0 °F
+    /// Hvis temperaturen >= 100.0 °F
+    if (f_temp >= 100) 
     {
       sprintf(f_buffer, "%03u.%1u%cF", f_temp / 10, f_temp % 10, 223);
       digitalWrite(20, LOW);
@@ -351,55 +374,61 @@ void loop() {
     }
   }
 
-  Serial.println(c_buffer); //Udskriver c_buffer i serial monitoren (Temperatur i °C)
-  Serial.println(f_buffer);  // print f_buffer (temperature in °F)
+  /// Udskriver c_buffer i serial monitoren (Temperatur i °C)
+  Serial.println(c_buffer); 
+  /// print f_buffer (temperature in °F)
+  Serial.println(f_buffer);  
   adjustTemperature(c_temp);
 
   //////// listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
     Serial.println("new client");
-    // an http request ends with a blank line
+    ///En http request slutter med en blank linje
     boolean currentLineIsBlank = true;
-    sendNTPpacket(timeServer); // send an NTP packet to a time server
+    /// sender en NTP pakke til tids serveren.
+    sendNTPpacket(timeServer); 
 
-  // wait to see if a reply is available
+  /// Vent for at se om der er et svar ledigt
   delay(1000);
   if (Udp.parsePacket()) {
-    // We've received a packet, read the data from it
-    Udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
+    /// Pakken er blevet modtaget, læs nu data´en fra den.
+    ///Læs pakken ind i bufferen read the packet into the buffer
+    Udp.read(packetBuffer, NTP_PACKET_SIZE); 
 
-    // the timestamp starts at byte 40 of the received packet and is four bytes,
+    /// the timestamp starts at byte 40 of the received packet and is four bytes,
     /// timestamp
-    // or two words, long. First, extract the two words:
-    ///
+    /// or two words, long. First, extract the two words:
     unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
     unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
     /// kombinere de fire bytes (to ord) til en long integer
-    ///Dette er NTP tid (sekunder siden Jan 1 1900):
+    /// Dette er NTP tid (sekunder siden Jan 1 1900):
     unsigned long secsSince1900 = highWord << 16 | lowWord;
     /// Nu konverter NTP tiden indtil hverdags tid
     ///Unix time starter i Jan 1 1970. i sekunder, hvilket svare til 2208988800: 
     const unsigned long seventyYears = 2208988800UL;
-    // subtract seventy years:
+    /// subtract seventy years:
     unsigned long epoch = secsSince1900 - seventyYears;
-    // print the hour, minute and second:
+    /// Udskriv timerne, minutterne og sekunderne:
     
     newtime = "";
     if ((epoch  % 86400L) / 3600) {
-      // In the first 10 hours, we'll want a leading '0'
+      // I de første 10 timer, så vil vi have et '0' foran vores tal (eks. '05' eller '01').
       newtime = "0";
     }
     newtime += (epoch  % 86400L) / 3600;
     newtime += ":";
   
     if (((epoch % 3600) / 60) < 10) {
-      newtime += "0";  /// For de første 10 minutter af hver time, så vil den starte ud med et 0 før hvert tal.
+      /// For de første 10 minutter af hver time, så vil den starte ud med et 0 før hvert tal.
+      newtime += "0"; 
     }
     newtime += (epoch  % 3600) / 60;
-    newtime += ":"; /// Tilføjer semikolon til newtime, sammen med timerne tilføjet fra sidste linje.
+    /// Tilføjer semikolon til newtime, sammen med timerne tilføjet fra sidste linje.
+    newtime += ":"; 
     if ((epoch % 60) < 10) {
-      newtime += "0"; /// For de første 10 sekunder af hver minut, så vil den starte ud med et 0 før hvert tal.
+      /// For de første 10 sekunder af hver minut, så vil den starte ud med et 0 før hvert tal.
+      newtime += "0"; 
     }
     newtime += epoch % 60;
       /// Checker schedules for om programmet skal køres
@@ -415,17 +444,22 @@ void loop() {
       if (client.available()) {
         char c = client.read();
          if( HTTP_req.length() < 120) 
-           HTTP_req += c; /// Gemmer HTTP request´en en char ad gangen. 
+           /// Gemmer HTTP request´en en char ad gangen. 
+           HTTP_req += c; 
            Serial.write(c); 
 
         /// hvis du er nået til slutningen af linjen(modtaget en ny linje
         /// karakter) og linjen er blank, så er http requesten sluttet 
         /// Så kan du sende et svar
         if (c == '\n' && currentLineIsBlank) {         
-          client.println("HTTP/1.1 200 OK"); /// Sender en standard http response header.
-          client.println("Content-Type: text/html"); /// Sætter typen for hjemmesiden.
-          client.println("Connection: close"); /// Forbindelsen vil blive lukket efter at responsen er fuldendt.
-          client.println("Refresh: 5"); /// Genstarter siden automatisk efter 5 sekunder.
+          /// Sender en standard http response header.
+          client.println("HTTP/1.1 200 OK"); 
+          /// Sætter typen for hjemmesiden.
+          client.println("Content-Type: text/html");
+          /// Forbindelsen vil blive lukket efter at responsen er fuldendt. 
+          client.println("Connection: close"); 
+          /// Genstarter siden automatisk efter 5 sekunder.
+          client.println("Refresh: 5"); 
           client.println();
 
           Serial.println(HTTP_req);
@@ -448,12 +482,12 @@ void loop() {
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
           client.println("<head>");
-
-          client.println("<script type=\"text/javascript\">");///////// Js Action starter her
-
-          client.println("</script>");///////// Js Action slutter her
-           
-          client.println("<style>");///////// Styling starter her
+          ///////// Js Action starter her
+          client.println("<script type=\"text/javascript\">");
+          ///////// Js Action slutter her
+          client.println("</script>");
+          ///////// Styling starter her
+          client.println("<style>");
           client.print("*{background-color:#000;color:hotpink;margin:6px auto;}h1{color:#00F;}");
           client.println("</style>");
 
@@ -466,8 +500,8 @@ void loop() {
             client.println("</h1>");
             client.println("<div><span id=\"temp_setting\">");
             client.print("Current temperature setting: ");
-
-            switch(tsetting) { ///Checker tsetting værdi og sætter viser den overensstemme værdi(fra cold til 6) /// Sætter den nuværende status for temperaturen ved hjælp af switch case.
+            ///Checker tsetting værdi og sætter viser den overensstemme værdi(fra cold til 6) /// Sætter den nuværende status for temperaturen ved hjælp af switch case.
+            switch(tsetting) { 
               case 0: client.println("Cold"); break;
               case 1: client.println("1"); break;
               case 2: client.println("2"); break;
@@ -477,13 +511,14 @@ void loop() {
               case 6: client.println("6"); break;
               default: client.println("Your heating system might be broken");
 }
-            client.println("</div></span>");///////////////////////////////////////////////////
+            ///////////////////////////////////////////////////
+            client.println("</div></span>");
 
             client.println("<button onclick=\"turnLedUp()\">Next Setting</button> </div>");
             client.println("<button onclick=\"turnLedDown()\">Prev Setting</button> </div>");
 
             client.println("<br />");
-          // output the value of temperature////////////////////
+            /// output for værdien af temperatur////////////////////
             client.print("Farenhiet = ");
             client.println(f_buffer);
             client.print("Celcius = ");
@@ -521,7 +556,8 @@ void loop() {
             
             /////JavaScript Sektion
             /// Refresh script
-            client.println("<script>window.setInterval(function(){"); /// Scriptet køres når siden starter op.
+            /// Scriptet køres når siden starter op.
+            client.println("<script>window.setInterval(function(){"); 
 
             client.println("nocache = \"&nocache=\" + Math.random() * 10;");
             client.println("var request = new XMLHttpRequest();");
@@ -569,8 +605,10 @@ void loop() {
             client.println("}");
 
             ///// Funktion for Change Time
-            client.println("function editTime() {"); /// Funktionen navngives.
-            client.println("event.preventDefault();"); /// Stopper siden fra at gå videre til andre sider.
+            /// Funktionen navngives.
+            client.println("function editTime() {"); 
+            /// Stopper siden fra at gå videre til andre sider.
+            client.println("event.preventDefault();"); 
             client.println("nocache = \"&nocache=\" + Math.random() * 10;");
             client.println("var request = new XMLHttpRequest();");
             client.println("request.onreadystatechange = function() {");
@@ -592,18 +630,20 @@ void loop() {
           }
         }
         if (c == '\n') {
-          currentLineIsBlank = true; /// Du starter en ny linje
+          /// Du starter en ny linje
+          currentLineIsBlank = true; 
         } else if (c != '\r') {      
-          currentLineIsBlank = false; /// Du har en karakter på den nuværende linje.
+          /// Du har en karakter på den nuværende linje.
+          currentLineIsBlank = false; 
         }
       }
     }
-    
-    delay(1); /// Giver webserveren tid til at modtage data´en.
-
-    client.stop(); ///Forbindelsen sluttes:
-
-    HTTP_req =""; ///HTTP requsten nulstilles.
+    /// Giver webserveren tid til at modtage data´en.
+    delay(1); 
+    ///Forbindelsen sluttes:
+    client.stop(); 
+    ///HTTP requsten nulstilles.
+    HTTP_req =""; 
     Serial.println("client disconnected");
   }
 }
