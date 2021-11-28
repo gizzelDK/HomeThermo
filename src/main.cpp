@@ -503,7 +503,7 @@ void loop() {
               case 6: client.println("6"); break;
               default: client.println("Your heating system might be broken");
 }
-            client.println("</div></span>");///////////////////////////////////////////////////
+            client.println("</span></div>");///////////////////////////////////////////////////
 
             client.println("<button onclick=\"turnLedUp()\">Next Setting</button> </div>");
             client.println("<button onclick=\"turnLedDown()\">Prev Setting</button> </div>");
@@ -517,31 +517,45 @@ void loop() {
             client.println("<br />");
 
             client.println();
-            client.print("<h1>Spare tid</h1>");
-            client.print("<form action=\"/get\">");
-            client.print("<input type=\"text\" id=\"Spartid\" name=\"input1\">");
-            client.print("<button onclick=\"editTime()\">Skift tid</button>");
-            client.print("</form>");
 
-            client.print("<div>");
-            client.print(nyTid);
-            client.print("</div>");
+            // client.print("<form action=\"/get\">");
+            // client.print("<input type=\"text\" id=\"Spartid\" name=\"input1\">");
+            // client.print("<button onclick=\"editTime()\">Skift tid</button>");
+            // client.print("</form>");
+
+            // client.print("<div>");
+            // client.print(nyTid);
+            // client.print("</div>");
             //// Tidsskemaer
+            client.print("<h2>Time Schedules</h2>");
             client.print("<div>");
-            client.print("<ul>");
+            client.print("<table>");
+            client.print("<tr>");
+            client.print("<th>Schedule</th>");
+            client.print("<th>Start Time</th>");
+            client.print("<th>End Time</th>");
+            client.print("<th>Heat Setting</th>");
+            client.print("</tr>");
+
               for(list<TimeSchedule>::iterator i = schedules.begin(); i != schedules.end(); i++){
-              client.print("<li>");
+
+              client.print("<tr>");
+              client.print("<td>");
               client.print(i->name);
-              client.print(" ");
+              client.print("</td>");
+              client.print("<td>");
               client.print(i->fromTime);
-              client.print(" ");
+              client.print("</td>");
+              client.print("<td>");
               client.print(i->toTime);
-              client.print(" ");
+              client.print("</td>");
+              client.print("<td>");
               client.print(i->setting);
-              client.print("</li>");
+              client.print("</td>");
+              client.print("</tr>");
               }
 
-            client.print("</ul>");
+            client.print("</table>");
             client.print("</div>");
 
             
