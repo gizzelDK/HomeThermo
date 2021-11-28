@@ -389,7 +389,7 @@ void loop() {
     // print the hour, minute and second:
     
     newtime = "";
-    if ((epoch  % 86400L) / 3600) {
+    if (((epoch  % 86400L) / 3600) < 10) {
       // In the first 10 hours, we'll want a leading '0'
       newtime = "0";
     }
