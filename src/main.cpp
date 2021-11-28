@@ -18,6 +18,7 @@ TemperatureSetting tsetting = Cold;
 
 float targetTemperature = 21.00;
 int chosenProgramme = 0;
+bool userOverride = false;
 
 const char* PARAM_INPUT_1 = "input1";
 
@@ -97,12 +98,39 @@ void factorySettings(){
     schedules.push_back(comfortTidskema);
     schedules.push_back(nightTidskema);
 }
-void runCurrentSchedule(){
+/// checks the set times on schedules and sets apropriate setting
+void runCurrentSchedule(String time){
+  String tempString = "";
+  int t4digit[4];
+  /// Get the time
+    for (unsigned int i = 0; i <=4; i++){
+
+      Serial.print(time[i]);
+      if (time[i] != ':')
+      {
+        tempString += time[i];
+      }
+    }
   
+    int t = tempString.toInt();
+  
+    for (list<TimeSchedule>::iterator j = schedules.begin(); j != schedules.end(); j++)
+    {
+      if (t < 1200 && j->toTime < 1200)
+      {
+         tsetting = j->setting;
+      }
+      if(j->fromTime >= t && j->toTime < t){
+            tsetting = j->setting;
+
+       }
+    }
+
 }
 /// settingUp function
-void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
+void settingUp(EthernetClient client)
 {
+  userOverride = true;
   switch(tsetting) {
                 case 0: client.print("1");tsetting = Set1; break;
                 case 1: client.print("2");tsetting = Set2; break;
@@ -117,7 +145,8 @@ void settingUp(EthernetClient client)////////////// sætter tsetting ++/-- og re
 /// settingDown function
 void settingDown(EthernetClient client)
 {
- switch(tsetting) {
+    userOverride = true;
+    switch(tsetting) {
               case 0: client.print("Cold");tsetting = Cold; break;
               case 1: client.print("Cold");tsetting = Cold; break;
               case 2: client.print("1");tsetting = Set1; break;
@@ -128,20 +157,27 @@ void settingDown(EthernetClient client)
               default: client.print("Your heating system might be broken");
   }
 }
-/// Get ledchange handling //// de her skal være én void adjustTemp()betinges af targetTemperature og newTemperature - skru op, hvis for koldt og ned...
+/// Sets targetTemperature on tsetting value and turns heat up or down
 void adjustTemperature(int m16)
 {
+   switch(tsetting) {
+              case 0: targetTemperature = 0.00; break;
+              case 1: targetTemperature = 6.00; break;
+              case 2: targetTemperature = 10.00; break;
+              case 3: targetTemperature = 15.00; break;
+              case 4: targetTemperature = 21.00; break;
+              case 5: targetTemperature = 26.00; break;
+              case 6: targetTemperature = 30.00; break;
+              default: targetTemperature = 21.00;
+  }
  float measured = m16 / 10.00;
-  Serial.println("---------------------------------------");
-  Serial.println(measured);
-  Serial.println("---------------------------------------");
+ Serial.println("------------------");
+ Serial.println(targetTemperature);
+ Serial.println("------------------");
   /// doSomething = target - measure
   float doSomething = measured - targetTemperature;
   /// state= decides if heat open/close signal must be send
   int state = 0;
-  Serial.println("---------------------------------------");
-  Serial.println(doSomething);
-  Serial.println("---------------------------------------");
   /// if doSomething !=0
   if(doSomething != 0){
     /// if doSomething > 0 luk mindre varme ind
@@ -172,14 +208,15 @@ void adjustTemperature(int m16)
     }
   }
 }
-void editTime(EthernetClient client)//////////////Giver nyTid værdien fra HTTP.req og returnerer den redigeret tid. 
+///Giver nyTid værdien fra HTTP.req og returnerer den redigeret tid. 
+void editTime(EthernetClient client)
 {
   nyTid = HTTP_req.substring(HTTP_req.indexOf("=")+1, HTTP_req.indexOf("=")+5);
   //nyTid = String(HTTP_req.indexOf("input1"));
   Serial.println("------------------------" + nyTid); //Debugging for nyTid.
 }
-
-void turnTemperatureUp(EthernetClient client)////////////// sætter tsetting ++/-- og returnerer den ny setting
+/// sætter tsetting ++/-- og returnerer den ny setting
+void turnTemperatureUp(EthernetClient client)
 {
  switch(tsetting) {
               case 0: client.print("1");tsetting = Set1; break;
@@ -321,6 +358,7 @@ void loop() {
   Serial.println(c_buffer); //Udskriver c_buffer i serial monitoren (Temperatur i °C)
   Serial.println(f_buffer);  // print f_buffer (temperature in °F)
   adjustTemperature(c_temp);
+
   //////// listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
@@ -351,7 +389,11 @@ void loop() {
     // print the hour, minute and second:
     
     newtime = "";
-    newtime = (epoch  % 86400L) / 3600;
+    if ((epoch  % 86400L) / 3600) {
+      // In the first 10 hours, we'll want a leading '0'
+      newtime = "0";
+    }
+    newtime += (epoch  % 86400L) / 3600;
     newtime += ":";
   
     if (((epoch % 3600) / 60) < 10) {
@@ -360,27 +402,34 @@ void loop() {
     }
     newtime += (epoch  % 3600) / 60;
   
-    Serial.print((epoch  % 86400L) / 3600); // Udskriver Timerne (86400 er lig med sekunder per dag)
-    newtime = "";
-    newtime = (epoch  % 86400L) / 3600;//Tilføj timer til newtime
+    //Serial.print((epoch  % 86400L) / 3600); // Udskriver Timerne (86400 er lig med sekunder per dag)
+    //newtime = "";
+    //newtime = (epoch  % 86400L) / 3600;//Tilføj timer til newtime
     newtime += ":";//Tilføjer semikolon til newtime, sammen med timerne tilføjet fra sidste linje.
-    Serial.print(':');
-    if (((epoch % 3600) / 60) < 10) { // Udskriver Minutterne, hvis minutterne er under 10 (værdien checkes om den er under 10)
-      newtime += "0";// For de første 10 minutter af hver time, så vil den starte ud med et 0 før hvert tal.
-      Serial.print('0');
-    }
-    newtime += (epoch  % 3600) / 60;
-    Serial.print((epoch  % 3600) / 60); // Udskriver Minutterne (3600 er lig med sekunder per minut)
+    //Serial.print(':');
+    // if (((epoch % 3600) / 60) < 10) { // Udskriver Minutterne, hvis minutterne er under 10 (værdien checkes om den er under 10)
+    //   newtime += "0";// For de første 10 minutter af hver time, så vil den starte ud med et 0 før hvert tal.
+    //  // Serial.print('0');
+    // }
+    //newtime += (epoch  % 3600) / 60;
+   // Serial.print((epoch  % 3600) / 60); // Udskriver Minutterne (3600 er lig med sekunder per minut)
 
-    newtime += ":";
+   // newtime += ":";
   
     if ((epoch % 60) < 10) {
       // In the first 10 seconds of each minute, we'll want a leading '0'
       // For de første 10 sekunder af hver minut, så vil vi starte ud med et 0 før hvert tal.
-      Serial.print('0');
+      //Serial.print('0');
       newtime += "0";
     }
     newtime += epoch % 60;
+      /// Check schedules for programme to run
+      if(!userOverride){
+        runCurrentSchedule(newtime);
+      }
+  Serial.println("--------**********");
+  Serial.println(newtime);
+  Serial.println("--------************");
   }
   // wait ten seconds before asking for the time again
  // delay(10000);
